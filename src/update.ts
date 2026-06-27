@@ -14,6 +14,10 @@ type GithubRelease = {
   assets: GithubAsset[];
 };
 
+type UpdateCheckResult =
+  | { status: 'current'; tag: string }
+  | { status: 'installed'; tag: string };
+
 const REPO_OWNER = 'nagomiita';
 const REPO_NAME = 'sqlite-vscode';
 const USER_AGENT = 'sqlite-vscode-updater';
@@ -75,13 +79,13 @@ export async function checkForUpdates(
   }
 
   try {
-    await vscode.window.withProgress(
+    const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: 'Checking for SQLite Vscode updates',
         cancellable: false,
       },
-      async () => {
+      async (): Promise<UpdateCheckResult> => {
         const release = await fetchJson<GithubRelease>(
           `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
         );
@@ -93,10 +97,7 @@ export async function checkForUpdates(
         }
 
         if (compareVersions(latestVersion, currentVersion) <= 0) {
-          vscode.window.showInformationMessage(
-            `SQLite Vscode is already up to date (${release.tag_name}).`,
-          );
-          return;
+          return { status: 'current', tag: release.tag_name };
         }
 
         const asset =
@@ -115,18 +116,26 @@ export async function checkForUpdates(
             'workbench.extensions.installExtension',
             vscode.Uri.file(vsixPath),
           );
-          const reload = await vscode.window.showInformationMessage(
-            `Installed ${release.tag_name}. Reload now to activate it.`,
-            'Reload Window',
-          );
-          if (reload === 'Reload Window') {
-            await vscode.commands.executeCommand('workbench.action.reloadWindow');
-          }
+          return { status: 'installed', tag: release.tag_name };
         } finally {
           await fs.rm(tempDir, { recursive: true, force: true });
         }
       },
     );
+
+    if (result.status === 'current') {
+      vscode.window.showInformationMessage(
+        `SQLite Vscode is already up to date (${result.tag}).`,
+      );
+    } else if (result.status === 'installed') {
+      const reload = await vscode.window.showInformationMessage(
+        `Installed ${result.tag}. Reload now to activate it.`,
+        'Reload Window',
+      );
+      if (reload === 'Reload Window') {
+        await vscode.commands.executeCommand('workbench.action.reloadWindow');
+      }
+    }
   } catch (err) {
     vscode.window.showErrorMessage(
       err instanceof Error ? err.message : String(err),
