@@ -6,8 +6,8 @@ import type {
   WebviewToHost,
 } from '../shared/protocol';
 import {
-  getTableSizeBytes,
   listTables,
+  loadTableSizes,
   openDatabase,
   runQuery,
   selectFromTable,
@@ -44,6 +44,10 @@ const persisted = (vscode.getState?.() ?? null) as {
 
 const MIN_SIDEBAR = 160;
 const MAX_SIDEBAR = 900;
+
+function log(level: 'info' | 'warn' | 'error', message: string): void {
+  vscode.postMessage({ type: 'log', level, message });
+}
 
 export function App() {
   const [db, setDb] = useState<DbHandle | null>(null);
@@ -185,31 +189,43 @@ export function App() {
     let cancelled = false;
     setSizeLoadState('loading');
     void (async () => {
-      for (const table of sizeTargets) {
-        try {
-          const sizeBytes = await getTableSizeBytes(db, table.name);
+      log('info', `Starting dbstat table size scan (${sizeTargets.length} tables).`);
+      try {
+        let lastLoggedPages = 0;
+        await loadTableSizes(db, (sizes, scannedPages) => {
           if (cancelled) return;
           setTables((prev) =>
-            prev.map((item) =>
-              item.name === table.name && item.type === table.type
-                ? { ...item, sizeBytes }
-                : item,
-            ),
+            prev.map((item) => {
+              const sizeBytes = sizes.get(item.name);
+              return sizeBytes === undefined ? item : { ...item, sizeBytes };
+            }),
           );
-        } catch {
-          if (!cancelled) {
-            setSizeLoadState('unavailable');
-            vscode.postMessage({
-              type: 'notify',
-              level: 'warn',
-              message:
-                'Table size display is unavailable because SQLite dbstat is not enabled.',
-            });
+          if (scannedPages - lastLoggedPages >= 1000) {
+            lastLoggedPages = scannedPages;
+            log(
+              'info',
+              `dbstat table size scan progress: ${scannedPages.toLocaleString()} pages scanned.`,
+            );
           }
-          return;
+        });
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : String(err);
+          setSizeLoadState('unavailable');
+          log('warn', `dbstat table size scan failed: ${message}`);
+          vscode.postMessage({
+            type: 'notify',
+            level: 'warn',
+            message:
+              'Table size display is unavailable because SQLite dbstat is not enabled.',
+          });
         }
+        return;
       }
-      if (!cancelled) setSizeLoadState('done');
+      if (!cancelled) {
+        log('info', 'Finished dbstat table size scan.');
+        setSizeLoadState('done');
+      }
     })();
 
     return () => {
@@ -231,17 +247,22 @@ export function App() {
       if (msg.type === 'open') {
         try {
           const source = new HostRangeSource(vscode, msg.size);
+          log('info', `Opening database ${msg.fileName} (${msg.size.toLocaleString()} bytes).`);
           const handle = await openDatabase(source);
           setDb(handle);
           setFileName(msg.fileName);
+          log('info', 'Loading table list.');
           const t = await listTables(handle, msg.size);
+          log('info', `Loaded ${t.length.toLocaleString()} tables/views.`);
           setTables(t);
           setSizeLoadState('idle');
           if (t.length > 0) {
             await selectTable(handle, t[0].name);
           }
         } catch (err) {
-          setFatal(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          log('error', `Failed to open database: ${message}`);
+          setFatal(message);
         }
       }
     };

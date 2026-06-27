@@ -17,17 +17,22 @@ export class SqliteEditorProvider
   public static readonly viewType = 'sqliteVscode.viewer';
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
-    return vscode.window.registerCustomEditorProvider(
+    const output = vscode.window.createOutputChannel('SQLite Vscode');
+    const provider = vscode.window.registerCustomEditorProvider(
       SqliteEditorProvider.viewType,
-      new SqliteEditorProvider(context),
+      new SqliteEditorProvider(context, output),
       {
         webviewOptions: { retainContextWhenHidden: true },
         supportsMultipleEditorsPerDocument: false,
       },
     );
+    return vscode.Disposable.from(provider, output);
   }
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly output: vscode.OutputChannel,
+  ) {}
 
   openCustomDocument(uri: vscode.Uri): SqliteDocument {
     return new SqliteDocument(uri);
@@ -84,6 +89,9 @@ export class SqliteEditorProvider
         }
       } else if (msg.type === 'log') {
         const out = `[sqlite-vscode] ${msg.message}`;
+        this.output.appendLine(
+          `${new Date().toISOString()} ${msg.level.toUpperCase()} ${msg.message}`,
+        );
         if (msg.level === 'error') console.error(out);
         else if (msg.level === 'warn') console.warn(out);
         else console.log(out);

@@ -54,6 +54,7 @@ export async function openDatabase(source: RangeSource): Promise<DbHandle> {
     SQLite.SQLITE_OPEN_READONLY,
     vfs.name,
   );
+  await enableSchemaRecoveryMode(sqlite3, db);
   const handle: DbHandle = { sqlite3, db };
   handlePromise = Promise.resolve(handle);
   return handle;
@@ -88,6 +89,19 @@ async function query(
   }
 
   return { columns, rows, truncated };
+}
+
+async function enableSchemaRecoveryMode(sqlite3: any, db: number): Promise<void> {
+  try {
+    for await (const stmt of sqlite3.statements(db, 'PRAGMA writable_schema=ON')) {
+      while ((await sqlite3.step(stmt)) === SQLite.SQLITE_ROW) {
+        // Drain any rows for compatibility with pragma execution semantics.
+      }
+    }
+  } catch {
+    // Best effort only. The database is opened read-only, so this is used only
+    // to tolerate malformed schema entries during introspection.
+  }
 }
 
 export async function listTables(
@@ -130,21 +144,49 @@ export async function listTables(
   return tables;
 }
 
-export async function getTableSizeBytes(
+export async function loadTableSizes(
   handle: DbHandle,
-  table: string,
-): Promise<number> {
-  const safe = table.replace(/'/g, "''");
-  const result = await query(
+  onProgress: (sizes: Map<string, number>, scannedPages: number) => void,
+): Promise<Map<string, number>> {
+  const objects = await query(
     handle,
-    `SELECT COALESCE(SUM(s.pgsize), 0)
-     FROM dbstat AS s
-     JOIN sqlite_master AS m ON m.name = s.name
-     WHERE m.type IN ('table','index')
-       AND m.tbl_name = '${safe}'`,
+    `SELECT name, tbl_name
+     FROM sqlite_master
+     WHERE type IN ('table','index')
+       AND tbl_name NOT LIKE 'sqlite_%'`,
     null,
   );
-  return Number(result.rows[0]?.[0] ?? 0);
+
+  const tableByObject = new Map<string, string>();
+  for (const row of objects.rows) {
+    tableByObject.set(String(row[0]), String(row[1]));
+  }
+
+  const { sqlite3, db } = handle;
+  const sizes = new Map<string, number>();
+  let scannedPages = 0;
+  let lastProgress = 0;
+
+  for await (const stmt of sqlite3.statements(
+    db,
+    `SELECT name, pgsize FROM dbstat WHERE name NOT LIKE 'sqlite_%'`,
+  )) {
+    while ((await sqlite3.step(stmt)) === SQLite.SQLITE_ROW) {
+      const [objectName, pgsize] = sqlite3.row(stmt);
+      const tableName = tableByObject.get(String(objectName));
+      if (!tableName) continue;
+
+      scannedPages++;
+      sizes.set(tableName, (sizes.get(tableName) ?? 0) + Number(pgsize ?? 0));
+      if (scannedPages - lastProgress >= 250) {
+        lastProgress = scannedPages;
+        onProgress(new Map(sizes), scannedPages);
+      }
+    }
+  }
+
+  onProgress(new Map(sizes), scannedPages);
+  return sizes;
 }
 
 export function runQuery(
