@@ -193,7 +193,10 @@ body {
   top: 0;
   z-index: 1;
   display: grid;
-  background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background));
+  background: var(
+    --vscode-editorGroupHeader-tabsBackground,
+    var(--vscode-editor-background, Canvas)
+  );
   border-bottom: 1px solid var(--grid-border);
 }
 .hcell {
