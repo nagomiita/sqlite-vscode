@@ -68,6 +68,10 @@ export function App() {
     setShowLogical((prev) => !prev);
   }, []);
 
+  const checkForUpdates = useCallback(() => {
+    vscode.postMessage({ type: 'check-for-updates' });
+  }, []);
+
   const onResizeStart = useCallback(
     (e: ReactPointerEvent) => {
       e.preventDefault();
@@ -213,16 +217,26 @@ export function App() {
       <div className="main">
         <div className="titlebar">
           <span className="file-name">{fileName}</span>
-          {hasLabels && (
+          <div className="title-actions">
             <button
               type="button"
-              className={`logical-toggle${showLogical ? ' on' : ''}`}
-              onClick={toggleLogical}
-              title="Toggle logical / physical names"
+              className="update-check"
+              onClick={checkForUpdates}
+              title="Check for extension updates"
             >
-              {showLogical ? 'Logical names' : 'Physical names'}
+              Check for Updates
             </button>
-          )}
+            {hasLabels && (
+              <button
+                type="button"
+                className={`logical-toggle${showLogical ? ' on' : ''}`}
+                onClick={toggleLogical}
+                title="Toggle logical / physical names"
+              >
+                {showLogical ? 'Logical names' : 'Physical names'}
+              </button>
+            )}
+          </div>
         </div>
         <div className="section-bar">
           <button

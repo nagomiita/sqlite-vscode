@@ -73,21 +73,16 @@ npm run package    # produces a .vsix (requires @vscode/vsce)
 GitHub Actions runs type checking, build, and VSIX packaging on pull requests
 and pushes to `main`.
 
-To publish a GitHub Release with the VSIX attached, create and push a tag that
-matches `package.json`:
-
-```bash
-git tag v0.0.1
-git push origin v0.0.1
-```
-
-The release workflow can also be run manually with the same `vX.Y.Z` tag.
+To publish a GitHub Release with the VSIX attached, run the Release workflow
+manually. It bumps `package.json` to the next patch version, creates the matching
+`vX.Y.Z` tag, and publishes the VSIX. Pushing an existing `vX.Y.Z` tag still
+publishes that tag after validating it matches `package.json`.
 
 ## Update
 
-If you install from a GitHub Release `.vsix`, use the command palette command
-`SQLite Vscode: Check for Updates` to download the latest GitHub Release asset,
-install it, and reload the window.
+If you install from a GitHub Release `.vsix`, use the viewer titlebar button or
+the command palette command `SQLite Vscode: Check for Updates` to download the
+latest GitHub Release asset, install it, and reload the window.
 
 ## License
 

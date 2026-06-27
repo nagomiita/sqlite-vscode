@@ -171,11 +171,19 @@ body.resizing {
 }
 .file-name {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.logical-toggle {
+.title-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.logical-toggle,
+.update-check {
   flex: none;
   font-size: 11px;
   font-weight: 600;
@@ -185,6 +193,13 @@ body.resizing {
   color: var(--vscode-button-secondaryForeground, inherit);
   background: var(--vscode-button-secondaryBackground, transparent);
   border: 1px solid var(--grid-border);
+}
+.logical-toggle:hover,
+.update-check:hover {
+  background: var(
+    --vscode-button-secondaryHoverBackground,
+    var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12))
+  );
 }
 .logical-toggle.on {
   color: var(--vscode-button-foreground, #fff);

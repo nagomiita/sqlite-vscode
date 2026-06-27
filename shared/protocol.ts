@@ -24,4 +24,5 @@ export type HostToWebview =
 export type WebviewToHost =
   | { type: 'ready' }
   | { type: 'read'; id: number; offset: number; length: number }
+  | { type: 'check-for-updates' }
   | { type: 'log'; level: 'info' | 'warn' | 'error'; message: string };
