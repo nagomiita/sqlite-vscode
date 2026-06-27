@@ -74,6 +74,14 @@ export class SqliteEditorProvider
         await this.handleRead(msg, getHandle, post);
       } else if (msg.type === 'check-for-updates') {
         await vscode.commands.executeCommand('sqliteVscode.checkForUpdates');
+      } else if (msg.type === 'notify') {
+        if (msg.level === 'error') {
+          vscode.window.showErrorMessage(msg.message);
+        } else if (msg.level === 'warn') {
+          vscode.window.showWarningMessage(msg.message);
+        } else {
+          vscode.window.showInformationMessage(msg.message);
+        }
       } else if (msg.type === 'log') {
         const out = `[sqlite-vscode] ${msg.message}`;
         if (msg.level === 'error') console.error(out);

@@ -95,6 +95,32 @@ body.resizing {
   text-transform: uppercase;
   font-size: 11px;
   opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.metric-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  text-transform: none;
+}
+.metric-toggle button {
+  border: 1px solid var(--grid-border);
+  background: transparent;
+  color: inherit;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.metric-toggle button.active {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border-color: var(--vscode-button-background, #0e639c);
 }
 .table-list {
   list-style: none;
@@ -149,6 +175,46 @@ body.resizing {
   flex: none;
   opacity: 0.55;
   font-size: 11px;
+}
+.table-metrics {
+  flex: none;
+  width: 82px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.metric-row {
+  display: grid;
+  grid-template-columns: minmax(34px, 1fr) 28px;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.metric-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  opacity: 0.62;
+  font-size: 10px;
+  font-weight: 500;
+}
+.metric-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--vscode-progressBar-background, rgba(128, 128, 128, 0.2));
+}
+.metric-bar span {
+  display: block;
+  height: 100%;
+  min-width: 1px;
+  border-radius: inherit;
+  background: var(--vscode-charts-blue, var(--vscode-focusBorder, #007acc));
+}
+.metric-bar.size span {
+  background: var(--vscode-charts-green, #89d185);
 }
 .empty {
   padding: 8px 12px;

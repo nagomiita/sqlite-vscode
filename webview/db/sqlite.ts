@@ -22,6 +22,12 @@ export type TableInfo = {
   name: string;
   type: 'table' | 'view';
   rowCount: number | null;
+  sizeBytes: number | null;
+};
+
+export type TableListResult = {
+  tables: TableInfo[];
+  dbstatError: string | null;
 };
 
 /** Opaque handle to the wa-sqlite instance and the opened database. */
@@ -92,7 +98,7 @@ async function query(
 export async function listTables(
   handle: DbHandle,
   fileSize: number,
-): Promise<TableInfo[]> {
+): Promise<TableListResult> {
   const meta = await query(
     handle,
     `SELECT name, type FROM sqlite_master
@@ -100,6 +106,29 @@ export async function listTables(
      ORDER BY type, name`,
     null,
   );
+
+  let dbstatError: string | null = null;
+  const sizes = new Map<string, number>();
+  try {
+    const stat = await query(
+      handle,
+      `SELECT m.tbl_name, SUM(s.pgsize)
+       FROM dbstat AS s
+       JOIN sqlite_master AS m ON m.name = s.name
+       WHERE m.type IN ('table','index')
+         AND m.tbl_name NOT LIKE 'sqlite_%'
+       GROUP BY m.tbl_name`,
+      null,
+    );
+    for (const row of stat.rows) {
+      sizes.set(String(row[0]), Number(row[1] ?? 0));
+    }
+  } catch (err) {
+    dbstatError =
+      err instanceof Error
+        ? err.message
+        : 'SQLite dbstat virtual table is unavailable.';
+  }
 
   const countRows = fileSize <= COUNT_SIZE_THRESHOLD;
   const tables: TableInfo[] = [];
@@ -119,9 +148,14 @@ export async function listTables(
         rowCount = null;
       }
     }
-    tables.push({ name, type, rowCount });
+    tables.push({
+      name,
+      type,
+      rowCount,
+      sizeBytes: type === 'table' ? sizes.get(name) ?? null : null,
+    });
   }
-  return tables;
+  return { tables, dbstatError };
 }
 
 export function runQuery(

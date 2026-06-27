@@ -20,6 +20,9 @@ import { TableList } from './components/TableList';
 import { Grid } from './components/Grid';
 import { SqlRunner } from './components/SqlRunner';
 import { estimateTextWidth } from './textMeasure';
+import { formatBytes } from './format';
+
+type TableMetricMode = 'rows' | 'size' | 'both';
 
 type VsCodeApi = {
   postMessage: (msg: WebviewToHost) => void;
@@ -34,6 +37,7 @@ const persisted = (vscode.getState?.() ?? null) as {
   showLogical?: boolean;
   sidebarWidth?: number;
   sqlCollapsed?: boolean;
+  tableMetricMode?: TableMetricMode;
 } | null;
 
 const MIN_SIDEBAR = 160;
@@ -58,12 +62,20 @@ export function App() {
   const [sqlCollapsed, setSqlCollapsed] = useState<boolean>(
     persisted?.sqlCollapsed ?? true,
   );
+  const [tableMetricMode, setTableMetricMode] = useState<TableMetricMode>(
+    persisted?.tableMetricMode ?? 'both',
+  );
   const [where, setWhere] = useState('');
 
   // Persist all UI preferences together so no key clobbers another.
   useEffect(() => {
-    vscode.setState?.({ showLogical, sidebarWidth, sqlCollapsed });
-  }, [showLogical, sidebarWidth, sqlCollapsed]);
+    vscode.setState?.({
+      showLogical,
+      sidebarWidth,
+      sqlCollapsed,
+      tableMetricMode,
+    });
+  }, [showLogical, sidebarWidth, sqlCollapsed, tableMetricMode]);
 
   const toggleLogical = useCallback(() => {
     setShowLogical((prev) => !prev);
@@ -83,15 +95,19 @@ export function App() {
       const primary = estimateTextWidth(logical, 13, 600);
       const sub = estimateTextWidth(table.name, 11, 400) + 6;
       const rowCount =
-        table.rowCount === null
+        tableMetricMode === 'size' || table.rowCount === null
           ? 0
           : estimateTextWidth(table.rowCount.toLocaleString(), 11, 400) + 12;
-      const chrome = 24 + 18 + 12 + rowCount + 18;
+      const size =
+        tableMetricMode === 'rows' || table.sizeBytes === null
+          ? 0
+          : estimateTextWidth(formatBytes(table.sizeBytes), 11, 600) + 12;
+      const chrome = 24 + 18 + 12 + rowCount + size + 42;
       return Math.max(max, primary + sub + chrome);
     }, MIN_SIDEBAR);
 
     return Math.min(MAX_SIDEBAR, Math.max(sidebarWidth, required));
-  }, [labels, showLogical, sidebarWidth, tables]);
+  }, [labels, showLogical, sidebarWidth, tableMetricMode, tables]);
 
   const onResizeStart = useCallback(
     (e: ReactPointerEvent) => {
@@ -167,8 +183,16 @@ export function App() {
           const handle = await openDatabase(source);
           setDb(handle);
           setFileName(msg.fileName);
-          const t = await listTables(handle, msg.size);
+          const { tables: t, dbstatError } = await listTables(handle, msg.size);
           setTables(t);
+          if (dbstatError) {
+            vscode.postMessage({
+              type: 'notify',
+              level: 'warn',
+              message:
+                'Table size display is unavailable because SQLite dbstat is not enabled.',
+            });
+          }
           if (t.length > 0) {
             await selectTable(handle, t[0].name);
           }
@@ -227,6 +251,8 @@ export function App() {
         labels={labels}
         showLogical={showLogical}
         width={effectiveSidebarWidth}
+        metricMode={tableMetricMode}
+        onMetricModeChange={setTableMetricMode}
       />
       <div
         className="resizer"
