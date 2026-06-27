@@ -22,7 +22,7 @@ export function getWebviewHtml(
     vscode.Uri.joinPath(extensionUri, 'dist', 'webview', 'main.css'),
   );
   const wasmUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'media', 'sql-wasm.wasm'),
+    vscode.Uri.joinPath(extensionUri, 'media', 'wa-sqlite-async.wasm'),
   );
 
   const csp = [
@@ -46,7 +46,7 @@ export function getWebviewHtml(
 <body>
   <div id="root"></div>
   <script nonce="${nonce}">
-    window.SQLJS_WASM_URI = ${JSON.stringify(wasmUri.toString())};
+    window.WASQLITE_WASM_URI = ${JSON.stringify(wasmUri.toString())};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

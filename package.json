@@ -64,13 +64,12 @@
     "@tanstack/react-virtual": "^3.10.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "sql.js": "^1.12.0"
+    "wa-sqlite": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@types/sql.js": "^1.4.9",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.24.0",

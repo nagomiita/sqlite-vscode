@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { SqlValue } from 'sql.js';
-import type { QueryResult } from '../db/sqlite';
+import type { QueryResult, SqlValue } from '../db/sqlite';
 
 type SortState = { col: number; dir: 'asc' | 'desc' } | null;
 

@@ -13,12 +13,16 @@ read-only SQL runner.
 - Table / view list with row counts
 - Virtualized scrolling grid (sort, filter)
 - Read-only SQL runner (`SELECT` / `WITH` / `PRAGMA` / `EXPLAIN` only)
-- Platform-independent (WASM via sql.js), matches your color theme
+- Opens multi-gigabyte databases via a lazy, on-demand VFS (only the pages a
+  query touches are read; the file is never loaded into memory in full)
+- Platform-independent (WASM via wa-sqlite), matches your color theme
 
 ## Limitations
 
-- Read-only. Loads the whole file into memory (≤ 200 MB).
-- No write / DDL / DML statements.
+- Read-only. No write / DDL / DML statements.
+- Results are capped at 5,000 rows per query; a banner appears when truncated.
+- Per-table `COUNT(*)` is skipped for files larger than 200 MB (full scans are
+  expensive over the lazy VFS).
 
 ## Develop
 
@@ -31,9 +35,10 @@ Then press `F5` ("Run Extension") and open a `.db` file in the new window.
 
 ## Architecture
 
-- `src/` — extension host: `CustomReadonlyEditorProvider`, CSP webview HTML
-- `webview/` — React UI + sql.js (WASM)
-- `shared/protocol.ts` — typed postMessage protocol
+- `src/` — extension host: `CustomReadonlyEditorProvider`, byte-range file
+  reads over a kept-open file handle, CSP webview HTML
+- `webview/` — React UI + wa-sqlite (WASM) with a read-only async range VFS
+- `shared/protocol.ts` — typed postMessage protocol (incl. lazy range reads)
 
 ## Package
 

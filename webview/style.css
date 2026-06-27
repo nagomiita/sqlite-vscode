@@ -306,3 +306,14 @@ body {
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 12px;
 }
+.truncated-banner {
+  padding: 6px 10px;
+  font-size: 12px;
+  background: var(
+    --vscode-inputValidation-warningBackground,
+    rgba(255, 200, 0, 0.12)
+  );
+  color: var(--vscode-inputValidation-warningForeground, inherit);
+  border-bottom: 1px solid
+    var(--vscode-inputValidation-warningBorder, rgba(255, 200, 0, 0.4));
+}

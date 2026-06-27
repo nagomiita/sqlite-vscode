@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Database } from 'sql.js';
 import type { HostToWebview, WebviewToHost } from '../shared/protocol';
 import {
   listTables,
   openDatabase,
   runQuery,
   selectFromTable,
+  type DbHandle,
   type QueryResult,
   type TableInfo,
 } from './db/sqlite';
+import { HostRangeSource } from './db/rangeSource';
 import { TableList } from './components/TableList';
 import { Grid } from './components/Grid';
 import { SqlRunner } from './components/SqlRunner';
@@ -21,13 +22,30 @@ declare function acquireVsCodeApi(): VsCodeApi;
 const vscode = acquireVsCodeApi();
 
 export function App() {
-  const [db, setDb] = useState<Database | null>(null);
+  const [db, setDb] = useState<DbHandle | null>(null);
   const [fileName, setFileName] = useState('');
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const selectTable = useCallback(
+    async (handle: DbHandle, name: string) => {
+      setActive(name);
+      setQueryError(null);
+      setBusy(true);
+      try {
+        setResult(await runQuery(handle, selectFromTable(handle, name)));
+      } catch (err) {
+        setQueryError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const handler = async (e: MessageEvent<HostToWebview>) => {
@@ -36,15 +54,16 @@ export function App() {
         setFatal(msg.message);
         return;
       }
-      if (msg.type === 'init') {
+      if (msg.type === 'open') {
         try {
-          const database = await openDatabase(new Uint8Array(msg.bytes));
-          setDb(database);
+          const source = new HostRangeSource(vscode, msg.size);
+          const handle = await openDatabase(source);
+          setDb(handle);
           setFileName(msg.fileName);
-          const t = await listTables(database);
+          const t = await listTables(handle, msg.size);
           setTables(t);
           if (t.length > 0) {
-            selectTable(database, t[0].name);
+            await selectTable(handle, t[0].name);
           }
         } catch (err) {
           setFatal(err instanceof Error ? err.message : String(err));
@@ -57,25 +76,18 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selectTable = useCallback((database: Database, name: string) => {
-    setActive(name);
-    setQueryError(null);
-    try {
-      setResult(runQuery(database, selectFromTable(database, name)));
-    } catch (err) {
-      setQueryError(err instanceof Error ? err.message : String(err));
-    }
-  }, []);
-
   const onRunSql = useCallback(
-    (sql: string) => {
+    async (sql: string) => {
       if (!db) return;
       setActive(null);
+      setBusy(true);
       try {
-        setResult(runQuery(db, sql));
+        setResult(await runQuery(db, sql));
         setQueryError(null);
       } catch (err) {
         setQueryError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
       }
     },
     [db],
@@ -100,11 +112,18 @@ export function App() {
           <span className="file-name">{fileName}</span>
         </div>
         <SqlRunner onRun={onRunSql} error={queryError} />
-        {result ? (
+        {result?.truncated ? (
+          <div className="truncated-banner">
+            Showing the first {result.rows.length.toLocaleString()} rows. Add a
+            narrower query to see more.
+          </div>
+        ) : null}
+        {busy ? <div className="grid-empty">Running…</div> : null}
+        {!busy && result ? (
           <Grid result={result} />
-        ) : (
+        ) : !busy ? (
           <div className="grid-empty">Select a table.</div>
-        )}
+        ) : null}
       </div>
     </div>
   );

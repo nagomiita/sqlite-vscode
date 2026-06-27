@@ -6,12 +6,12 @@ const path = require('node:path');
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
-/** Copy the sql.js wasm binary into media/ so the webview can load it. */
+/** Copy the wa-sqlite (Asyncify) wasm binary into media/ for the webview. */
 function copyWasm() {
-  const src = require.resolve('sql.js/dist/sql-wasm.wasm');
+  const src = require.resolve('wa-sqlite/dist/wa-sqlite-async.wasm');
   const destDir = path.join(__dirname, 'media');
   fs.mkdirSync(destDir, { recursive: true });
-  fs.copyFileSync(src, path.join(destDir, 'sql-wasm.wasm'));
+  fs.copyFileSync(src, path.join(destDir, 'wa-sqlite-async.wasm'));
 }
 
 /** @type {import('esbuild').BuildOptions} */

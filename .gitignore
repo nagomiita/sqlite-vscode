@@ -1,5 +1,5 @@
 node_modules/
 dist/
-media/sql-wasm.wasm
+media/wa-sqlite-async.wasm
 *.vsix
 .DS_Store
