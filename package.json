@@ -2,7 +2,7 @@
   "name": "sqlite-vscode",
   "displayName": "SQLite Vscode",
   "description": "Quick read-only SQLite viewer for VS Code with a virtualized table UI and a read-only SQL runner.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "nagomiita",
   "private": true,
   "license": "MIT",
