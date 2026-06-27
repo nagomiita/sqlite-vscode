@@ -11,6 +11,11 @@
   logical (human-readable) names, with the physical name shown as subtext.
   Names come from a sibling `<db>.labels.json` or the `sqliteVscode.labelsPath`
   setting.
+- The sidebar is now resizable by dragging the divider; the width is remembered.
+- The SQL runner can be collapsed via the `SQL` section toggle; the state is
+  remembered.
+- Clarified that the grid filter is a plain text match over already-loaded rows
+  (not a column-name search); use the SQL box for column conditions.
 
 ## 0.0.1
 

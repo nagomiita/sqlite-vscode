@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type {
   HostToWebview,
   Labels,
@@ -27,7 +28,14 @@ type VsCodeApi = {
 declare function acquireVsCodeApi(): VsCodeApi;
 const vscode = acquireVsCodeApi();
 
-const persisted = (vscode.getState?.() ?? null) as { showLogical?: boolean } | null;
+const persisted = (vscode.getState?.() ?? null) as {
+  showLogical?: boolean;
+  sidebarWidth?: number;
+  sqlCollapsed?: boolean;
+} | null;
+
+const MIN_SIDEBAR = 160;
+const MAX_SIDEBAR = 600;
 
 export function App() {
   const [db, setDb] = useState<DbHandle | null>(null);
@@ -42,14 +50,45 @@ export function App() {
   const [showLogical, setShowLogical] = useState<boolean>(
     persisted?.showLogical ?? false,
   );
+  const [sidebarWidth, setSidebarWidth] = useState<number>(
+    persisted?.sidebarWidth ?? 240,
+  );
+  const [sqlCollapsed, setSqlCollapsed] = useState<boolean>(
+    persisted?.sqlCollapsed ?? false,
+  );
+
+  // Persist all UI preferences together so no key clobbers another.
+  useEffect(() => {
+    vscode.setState?.({ showLogical, sidebarWidth, sqlCollapsed });
+  }, [showLogical, sidebarWidth, sqlCollapsed]);
 
   const toggleLogical = useCallback(() => {
-    setShowLogical((prev) => {
-      const next = !prev;
-      vscode.setState?.({ showLogical: next });
-      return next;
-    });
+    setShowLogical((prev) => !prev);
   }, []);
+
+  const onResizeStart = useCallback(
+    (e: ReactPointerEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = sidebarWidth;
+      const onMove = (ev: PointerEvent) => {
+        const next = Math.min(
+          MAX_SIDEBAR,
+          Math.max(MIN_SIDEBAR, startW + ev.clientX - startX),
+        );
+        setSidebarWidth(next);
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        document.body.classList.remove('resizing');
+      };
+      document.body.classList.add('resizing');
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    },
+    [sidebarWidth],
+  );
 
   const selectTable = useCallback(
     async (handle: DbHandle, name: string) => {
@@ -138,6 +177,14 @@ export function App() {
         onSelect={(name) => selectTable(db, name)}
         labels={labels}
         showLogical={showLogical}
+        width={sidebarWidth}
+      />
+      <div
+        className="resizer"
+        onPointerDown={onResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        title="Drag to resize"
       />
       <div className="main">
         <div className="titlebar">
@@ -153,7 +200,18 @@ export function App() {
             </button>
           )}
         </div>
-        <SqlRunner onRun={onRunSql} error={queryError} />
+        <div className="section-bar">
+          <button
+            type="button"
+            className="section-toggle"
+            onClick={() => setSqlCollapsed((v) => !v)}
+            aria-expanded={!sqlCollapsed}
+          >
+            <span className="chevron">{sqlCollapsed ? '▸' : '▾'}</span>
+            SQL
+          </button>
+        </div>
+        {!sqlCollapsed && <SqlRunner onRun={onRunSql} error={queryError} />}
         {result?.truncated ? (
           <div className="truncated-banner">
             Showing the first {result.rows.length.toLocaleString()} rows. Add a

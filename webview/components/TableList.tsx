@@ -7,6 +7,7 @@ type Props = {
   onSelect: (name: string) => void;
   labels: Labels | null;
   showLogical: boolean;
+  width: number;
 };
 
 export function TableList({
@@ -15,9 +16,10 @@ export function TableList({
   onSelect,
   labels,
   showLogical,
+  width,
 }: Props) {
   return (
-    <div className="sidebar">
+    <div className="sidebar" style={{ width }}>
       <div className="sidebar-header">Tables &amp; Views</div>
       <ul className="table-list">
         {tables.map((t) => {

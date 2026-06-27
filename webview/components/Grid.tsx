@@ -137,9 +137,10 @@ export function Grid({ result, columnLabels, showLogical }: Props) {
       <div className="grid-toolbar">
         <input
           className="filter-input"
-          placeholder="Filter rows..."
+          placeholder="Filter loaded rows (text match across all columns)…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
+          title="Filters only the rows already loaded into the grid. This is a plain text match across all columns — it is not a column-name search. Use the SQL box above for column conditions (e.g. WHERE name LIKE ...)."
         />
         <span className="grid-count">
           {processed.length.toLocaleString()} rows
