@@ -28,8 +28,17 @@
     "viewer"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:sqliteVscode.checkForUpdates"
+  ],
   "contributes": {
+    "commands": [
+      {
+        "command": "sqliteVscode.checkForUpdates",
+        "title": "SQLite Vscode: Check for Updates",
+        "category": "SQLite Vscode"
+      }
+    ],
     "customEditors": [
       {
         "viewType": "sqliteVscode.viewer",

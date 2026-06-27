@@ -83,6 +83,12 @@ git push origin v0.0.1
 
 The release workflow can also be run manually with the same `vX.Y.Z` tag.
 
+## Update
+
+If you install from a GitHub Release `.vsix`, use the command palette command
+`SQLite Vscode: Check for Updates` to download the latest GitHub Release asset,
+install it, and reload the window.
+
 ## License
 
 MIT
