@@ -7,6 +7,10 @@
   open without loading into memory. Removed the 200 MB limit.
 - Query results are capped (5,000 rows) with a truncation banner.
 - Per-table `COUNT(*)` is skipped above 200 MB to avoid full scans.
+- Logical names: a single toggle switches tables/columns between physical and
+  logical (human-readable) names, with the physical name shown as subtext.
+  Names come from a sibling `<db>.labels.json` or the `sqliteVscode.labelsPath`
+  setting.
 
 ## 0.0.1
 

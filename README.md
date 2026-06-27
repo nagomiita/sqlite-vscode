@@ -15,6 +15,9 @@ read-only SQL runner.
 - Read-only SQL runner (`SELECT` / `WITH` / `PRAGMA` / `EXPLAIN` only)
 - Opens multi-gigabyte databases via a lazy, on-demand VFS (only the pages a
   query touches are read; the file is never loaded into memory in full)
+- Logical (human-readable) names for tables/columns via a single toggle, with
+  the physical name kept as subtext. Names are read from a sibling
+  `<db>.labels.json` or the `sqliteVscode.labelsPath` setting
 - Platform-independent (WASM via wa-sqlite), matches your color theme
 
 ## Limitations
@@ -23,6 +26,25 @@ read-only SQL runner.
 - Results are capped at 5,000 rows per query; a banner appears when truncated.
 - Per-table `COUNT(*)` is skipped for files larger than 200 MB (full scans are
   expensive over the lazy VFS).
+
+## Logical names
+
+SQLite has no native column comments, so logical names are supplied externally.
+Place a `<dbFileName>.labels.json` next to the database (e.g. `local.db` ->
+`local.db.labels.json`), or point `sqliteVscode.labelsPath` at one:
+
+```json
+{
+  "tables": { "system_aws_lambda_logs": "AWS Lambda ログ" },
+  "columns": {
+    "system_aws_lambda_logs": { "function_name": "関数名" }
+  }
+}
+```
+
+The toolbar toggle then switches all tables/columns between physical and logical
+names (the physical name stays visible as subtext). Items without a label fall
+back to the physical name.
 
 ## Develop
 

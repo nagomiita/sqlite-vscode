@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { HostToWebview, WebviewToHost } from '../shared/protocol';
+import type {
+  HostToWebview,
+  Labels,
+  WebviewToHost,
+} from '../shared/protocol';
 import {
   listTables,
   openDatabase,
@@ -16,10 +20,14 @@ import { SqlRunner } from './components/SqlRunner';
 
 type VsCodeApi = {
   postMessage: (msg: WebviewToHost) => void;
+  getState?: () => unknown;
+  setState?: (state: unknown) => void;
 };
 
 declare function acquireVsCodeApi(): VsCodeApi;
 const vscode = acquireVsCodeApi();
+
+const persisted = (vscode.getState?.() ?? null) as { showLogical?: boolean } | null;
 
 export function App() {
   const [db, setDb] = useState<DbHandle | null>(null);
@@ -30,6 +38,18 @@ export function App() {
   const [fatal, setFatal] = useState<string | null>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [labels, setLabels] = useState<Labels | null>(null);
+  const [showLogical, setShowLogical] = useState<boolean>(
+    persisted?.showLogical ?? false,
+  );
+
+  const toggleLogical = useCallback(() => {
+    setShowLogical((prev) => {
+      const next = !prev;
+      vscode.setState?.({ showLogical: next });
+      return next;
+    });
+  }, []);
 
   const selectTable = useCallback(
     async (handle: DbHandle, name: string) => {
@@ -52,6 +72,10 @@ export function App() {
       const msg = e.data;
       if (msg.type === 'error') {
         setFatal(msg.message);
+        return;
+      }
+      if (msg.type === 'labels') {
+        setLabels(msg.labels);
         return;
       }
       if (msg.type === 'open') {
@@ -100,16 +124,34 @@ export function App() {
     return <div className="loading">Loading database…</div>;
   }
 
+  const hasLabels = Boolean(
+    labels && (labels.tables || labels.columns),
+  );
+  const columnLabels =
+    active && labels?.columns ? labels.columns[active] : undefined;
+
   return (
     <div className="app">
       <TableList
         tables={tables}
         active={active}
         onSelect={(name) => selectTable(db, name)}
+        labels={labels}
+        showLogical={showLogical}
       />
       <div className="main">
         <div className="titlebar">
           <span className="file-name">{fileName}</span>
+          {hasLabels && (
+            <button
+              type="button"
+              className={`logical-toggle${showLogical ? ' on' : ''}`}
+              onClick={toggleLogical}
+              title="Toggle logical / physical names"
+            >
+              {showLogical ? 'Logical names' : 'Physical names'}
+            </button>
+          )}
         </div>
         <SqlRunner onRun={onRunSql} error={queryError} />
         {result?.truncated ? (
@@ -120,7 +162,11 @@ export function App() {
         ) : null}
         {busy ? <div className="grid-empty">Running…</div> : null}
         {!busy && result ? (
-          <Grid result={result} />
+          <Grid
+            result={result}
+            columnLabels={columnLabels}
+            showLogical={showLogical}
+          />
         ) : !busy ? (
           <div className="grid-empty">Select a table.</div>
         ) : null}

@@ -6,6 +6,9 @@ type SortState = { col: number; dir: 'asc' | 'desc' } | null;
 
 type Props = {
   result: QueryResult;
+  /** physical column name -> logical name (only for an active table view). */
+  columnLabels?: Record<string, string>;
+  showLogical?: boolean;
 };
 
 function isBlob(v: SqlValue): v is Uint8Array {
@@ -51,7 +54,7 @@ const CHAR_PX = 7.5;
 const MIN_COL = 80;
 const MAX_COL = 360;
 
-export function Grid({ result }: Props) {
+export function Grid({ result, columnLabels, showLogical }: Props) {
   const { columns, rows } = result;
   const [sort, setSort] = useState<SortState>(null);
   const [filter, setFilter] = useState('');
@@ -61,10 +64,19 @@ export function Grid({ result }: Props) {
   } | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
 
+  const headers = useMemo(
+    () =>
+      columns.map((c) => {
+        const logical = showLogical ? columnLabels?.[c] : undefined;
+        return { physical: c, logical, primary: logical ?? c };
+      }),
+    [columns, columnLabels, showLogical],
+  );
+
   const colWidths = useMemo(() => {
     const sample = rows.slice(0, 200);
     return columns.map((c, i) => {
-      let maxLen = c.length;
+      let maxLen = headers[i].primary.length;
       for (const r of sample) {
         const len = formatValue(r[i]).length;
         if (len > maxLen) maxLen = len;
@@ -74,7 +86,7 @@ export function Grid({ result }: Props) {
         Math.max(MIN_COL, Math.round(maxLen * CHAR_PX) + 20),
       );
     });
-  }, [columns, rows]);
+  }, [columns, rows, headers]);
 
   const template = useMemo(
     () => `${IDX_WIDTH}px ${colWidths.map((w) => `${w}px`).join(' ')}`,
@@ -142,9 +154,18 @@ export function Grid({ result }: Props) {
                 key={i}
                 className="hcell"
                 onClick={() => toggleSort(i)}
-                title={c}
+                title={
+                  headers[i].logical
+                    ? `${headers[i].logical} (${c})`
+                    : c
+                }
               >
-                <span className="hcell-name">{c}</span>
+                <span className="hcell-name">
+                  <span className="name-primary">{headers[i].primary}</span>
+                  {headers[i].logical && (
+                    <span className="name-sub">{c}</span>
+                  )}
+                </span>
                 {sort?.col === i && (
                   <span className="sort-ind">
                     {sort.dir === 'asc' ? '▲' : '▼'}
@@ -178,7 +199,12 @@ export function Grid({ result }: Props) {
                       }`}
                       title={formatValue(c)}
                       onClick={() =>
-                        setDetail({ column: columns[ci], value: c })
+                        setDetail({
+                          column: headers[ci].logical
+                            ? `${headers[ci].logical} (${columns[ci]})`
+                            : columns[ci],
+                          value: c,
+                        })
                       }
                     >
                       {c === null ? 'NULL' : formatValue(c)}

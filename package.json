@@ -50,7 +50,17 @@
         ],
         "priority": "default"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "SQLite Vscode",
+      "properties": {
+        "sqliteVscode.labelsPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to a JSON file mapping physical table/column names to logical (human-readable) names. Absolute, or relative to the database file. When empty, a sibling `<dbFileName>.labels.json` is used if present."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "node esbuild.js",
