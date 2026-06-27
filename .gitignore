@@ -1,0 +1,5 @@
+node_modules/
+dist/
+media/sql-wasm.wasm
+*.vsix
+.DS_Store
