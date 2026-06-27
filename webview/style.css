@@ -71,11 +71,16 @@ body {
   font-size: 13px;
 }
 .table-item:hover {
-  background: var(--vscode-list-hoverBackground);
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
 }
 .table-item.active {
-  background: var(--vscode-list-activeSelectionBackground);
-  color: var(--vscode-list-activeSelectionForeground);
+  background: var(
+    --vscode-list-activeSelectionBackground,
+    var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.28))
+  );
+  color: var(--vscode-list-activeSelectionForeground, inherit);
+  box-shadow: inset 2px 0 0 0 var(--vscode-focusBorder, #007acc);
+  font-weight: 600;
 }
 .badge {
   font-size: 9px;
