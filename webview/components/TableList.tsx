@@ -1,9 +1,5 @@
 import type { Labels } from '../../shared/protocol';
 import type { TableInfo } from '../db/sqlite';
-import { formatBytes } from '../format';
-
-type TableMetricMode = 'rows' | 'size' | 'both';
-type SizeLoadState = 'idle' | 'loading' | 'done' | 'unavailable';
 
 type Props = {
   tables: TableInfo[];
@@ -12,9 +8,6 @@ type Props = {
   labels: Labels | null;
   showLogical: boolean;
   width: number;
-  metricMode: TableMetricMode;
-  onMetricModeChange: (mode: TableMetricMode) => void;
-  sizeLoadState: SizeLoadState;
 };
 
 export function TableList({
@@ -24,62 +17,21 @@ export function TableList({
   labels,
   showLogical,
   width,
-  metricMode,
-  onMetricModeChange,
-  sizeLoadState,
 }: Props) {
-  const maxRows = Math.max(0, ...tables.map((t) => t.rowCount ?? 0));
-  const maxSize = Math.max(0, ...tables.map((t) => t.sizeBytes ?? 0));
-  const showRows = metricMode === 'rows' || metricMode === 'both';
-  const showSize = metricMode === 'size' || metricMode === 'both';
-
   return (
     <div className="sidebar" style={{ width }}>
-      <div className="sidebar-header">
-        <span>Tables &amp; Views</span>
-        <div className="metric-toggle" aria-label="Table metrics">
-          {(['rows', 'size', 'both'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={metricMode === mode ? 'active' : ''}
-              onClick={() => onMetricModeChange(mode)}
-              title={`Show ${mode} metrics`}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-      </div>
+      <div className="sidebar-header">Tables &amp; Views</div>
       <ul className="table-list">
         {tables.map((t) => {
           const logical = labels?.tables?.[t.name];
           const useLogical = showLogical && Boolean(logical);
-          const rowPct =
-            maxRows > 0 && t.rowCount !== null ? t.rowCount / maxRows : 0;
-          const sizePct =
-            maxSize > 0 && t.sizeBytes !== null ? t.sizeBytes / maxSize : 0;
-          const rowText =
-            t.rowCount === null ? null : `${t.rowCount.toLocaleString()} rows`;
-          const sizeText =
-            t.sizeBytes === null ? null : formatBytes(t.sizeBytes);
-          const isSizePending =
-            showSize &&
-            t.type === 'table' &&
-            t.sizeBytes === null &&
-            sizeLoadState === 'loading';
-          const titleParts = [
-            logical ? `${logical} (${t.name})` : t.name,
-            rowText,
-            sizeText ? `${sizeText} including indexes` : null,
-          ].filter(Boolean);
           return (
             <li key={`${t.type}:${t.name}`}>
               <button
                 type="button"
                 className={`table-item${active === t.name ? ' active' : ''}`}
                 onClick={() => onSelect(t.name)}
-                title={titleParts.join(' - ')}
+                title={logical ? `${logical} (${t.name})` : t.name}
               >
                 <span className={`badge badge-${t.type}`}>
                   {t.type === 'view' ? 'V' : 'T'}
@@ -91,43 +43,6 @@ export function TableList({
                   {useLogical && (
                     <span className="name-sub">{t.name}</span>
                   )}
-                </span>
-                <span className="table-metrics">
-                  {showRows && rowText && (
-                    <span className="metric-line">
-                      <span className="metric-value">
-                        {t.rowCount?.toLocaleString()}
-                      </span>
-                      <span className="metric-bar rows" aria-hidden="true">
-                        <span style={{ width: `${rowPct * 100}%` }} />
-                      </span>
-                    </span>
-                  )}
-                  {showSize && sizeText && (
-                    <span className="metric-line">
-                      <span className="metric-value">{sizeText}</span>
-                      <span className="metric-bar size" aria-hidden="true">
-                        <span style={{ width: `${sizePct * 100}%` }} />
-                      </span>
-                    </span>
-                  )}
-                  {isSizePending && (
-                    <span className="metric-line loading">
-                      <span className="metric-value">loading</span>
-                      <span className="metric-bar pending" aria-hidden="true">
-                        <span />
-                      </span>
-                    </span>
-                  )}
-                  {showSize &&
-                    t.type === 'table' &&
-                    sizeLoadState === 'unavailable' &&
-                    t.sizeBytes === null && (
-                      <span className="metric-line unavailable">
-                        <span className="metric-value">unavailable</span>
-                        <span className="metric-bar unavailable" />
-                      </span>
-                    )}
                 </span>
               </button>
             </li>

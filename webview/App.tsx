@@ -7,7 +7,6 @@ import type {
 } from '../shared/protocol';
 import {
   listTables,
-  loadTableSizes,
   openDatabase,
   runQuery,
   selectFromTable,
@@ -21,10 +20,6 @@ import { TableList } from './components/TableList';
 import { Grid } from './components/Grid';
 import { SqlRunner } from './components/SqlRunner';
 import { estimateTextWidth } from './textMeasure';
-import { formatBytes } from './format';
-
-type TableMetricMode = 'rows' | 'size' | 'both';
-type SizeLoadState = 'idle' | 'loading' | 'done' | 'unavailable';
 
 type VsCodeApi = {
   postMessage: (msg: WebviewToHost) => void;
@@ -39,12 +34,10 @@ const persisted = (vscode.getState?.() ?? null) as {
   showLogical?: boolean;
   sidebarWidth?: number;
   sqlCollapsed?: boolean;
-  tableMetricMode?: TableMetricMode;
 } | null;
 
 const MIN_SIDEBAR = 160;
 const MAX_SIDEBAR = 900;
-const TABLE_SIZE_SCAN_TIMEOUT_MS = 15_000;
 
 function log(level: 'info' | 'warn' | 'error', message: string): void {
   vscode.postMessage({ type: 'log', level, message });
@@ -69,10 +62,6 @@ export function App() {
   const [sqlCollapsed, setSqlCollapsed] = useState<boolean>(
     persisted?.sqlCollapsed ?? true,
   );
-  const [tableMetricMode, setTableMetricMode] = useState<TableMetricMode>(
-    persisted?.tableMetricMode ?? 'both',
-  );
-  const [sizeLoadState, setSizeLoadState] = useState<SizeLoadState>('idle');
   const [where, setWhere] = useState('');
 
   // Persist all UI preferences together so no key clobbers another.
@@ -81,9 +70,8 @@ export function App() {
       showLogical,
       sidebarWidth,
       sqlCollapsed,
-      tableMetricMode,
     });
-  }, [showLogical, sidebarWidth, sqlCollapsed, tableMetricMode]);
+  }, [showLogical, sidebarWidth, sqlCollapsed]);
 
   const toggleLogical = useCallback(() => {
     setShowLogical((prev) => !prev);
@@ -102,20 +90,12 @@ export function App() {
 
       const primary = estimateTextWidth(logical, 13, 600);
       const sub = estimateTextWidth(table.name, 11, 400) + 6;
-      const rowCount =
-        tableMetricMode === 'size' || table.rowCount === null
-          ? 0
-          : estimateTextWidth(table.rowCount.toLocaleString(), 11, 400) + 12;
-      const size =
-        tableMetricMode === 'rows' || table.sizeBytes === null
-          ? 0
-          : estimateTextWidth(formatBytes(table.sizeBytes), 11, 600) + 12;
-      const chrome = 24 + 18 + 12 + rowCount + size + 72;
+      const chrome = 24 + 18 + 12 + 18;
       return Math.max(max, primary + sub + chrome);
     }, MIN_SIDEBAR);
 
     return Math.min(MAX_SIDEBAR, Math.max(sidebarWidth, required));
-  }, [labels, showLogical, sidebarWidth, tableMetricMode, tables]);
+  }, [labels, showLogical, sidebarWidth, tables]);
 
   const onResizeStart = useCallback(
     (e: ReactPointerEvent) => {
@@ -175,93 +155,6 @@ export function App() {
   }, [db, active, selectTable]);
 
   useEffect(() => {
-    if (!db) return;
-    if (tableMetricMode === 'rows') return;
-    if (sizeLoadState !== 'idle') return;
-
-    const sizeTargets = tables.filter(
-      (table) => table.type === 'table' && table.sizeBytes === null,
-    );
-    if (sizeTargets.length === 0) {
-      setSizeLoadState('done');
-      return;
-    }
-
-    let cancelled = false;
-    let timedOut = false;
-    const timeout = window.setTimeout(() => {
-      if (cancelled) return;
-      timedOut = true;
-      setSizeLoadState('unavailable');
-      log(
-        'warn',
-        `dbstat table size scan timed out after ${TABLE_SIZE_SCAN_TIMEOUT_MS / 1000}s.`,
-      );
-      vscode.postMessage({
-        type: 'notify',
-        level: 'warn',
-        message:
-          'Table size calculation timed out. This database is too large or slow for dbstat size scanning.',
-      });
-    }, TABLE_SIZE_SCAN_TIMEOUT_MS);
-
-    setSizeLoadState('loading');
-    void (async () => {
-      log('info', `Starting dbstat table size scan (${sizeTargets.length} tables).`);
-      try {
-        let lastLoggedPages = 0;
-        await loadTableSizes(db, (sizes, scannedPages) => {
-          if (cancelled || timedOut) return;
-          setTables((prev) =>
-            prev.map((item) => {
-              const sizeBytes = sizes.get(item.name);
-              return sizeBytes === undefined ? item : { ...item, sizeBytes };
-            }),
-          );
-          if (scannedPages === 0) {
-            log(
-              'info',
-              `dbstat aggregate size scan returned ${sizes.size.toLocaleString()} tables.`,
-            );
-            return;
-          }
-          if (scannedPages - lastLoggedPages >= 1000) {
-            lastLoggedPages = scannedPages;
-            log(
-              'info',
-              `dbstat table size scan progress: ${scannedPages.toLocaleString()} pages scanned.`,
-            );
-          }
-        });
-      } catch (err) {
-        if (!cancelled && !timedOut) {
-          window.clearTimeout(timeout);
-          const message = err instanceof Error ? err.message : String(err);
-          setSizeLoadState('unavailable');
-          log('warn', `dbstat table size scan failed: ${message}`);
-          vscode.postMessage({
-            type: 'notify',
-            level: 'warn',
-            message:
-              'Table size display is unavailable because SQLite dbstat is not enabled.',
-          });
-        }
-        return;
-      }
-      if (!cancelled && !timedOut) {
-        window.clearTimeout(timeout);
-        log('info', 'Finished dbstat table size scan.');
-        setSizeLoadState('done');
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [db, sizeLoadState, tableMetricMode, tables]);
-
-  useEffect(() => {
     const handler = async (e: MessageEvent<HostToWebview>) => {
       const msg = e.data;
       if (msg.type === 'error') {
@@ -280,10 +173,9 @@ export function App() {
           setDb(handle);
           setFileName(msg.fileName);
           log('info', 'Loading table list.');
-          const t = await listTables(handle, msg.size);
+          const t = await listTables(handle);
           log('info', `Loaded ${t.length.toLocaleString()} tables/views.`);
           setTables(t);
-          setSizeLoadState('idle');
           if (t.length > 0) {
             await selectTable(handle, t[0].name);
           }
@@ -344,9 +236,6 @@ export function App() {
         labels={labels}
         showLogical={showLogical}
         width={effectiveSidebarWidth}
-        metricMode={tableMetricMode}
-        onMetricModeChange={setTableMetricMode}
-        sizeLoadState={sizeLoadState}
       />
       <div
         className="resizer"

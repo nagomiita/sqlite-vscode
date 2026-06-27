@@ -21,8 +21,6 @@ export type QueryResult = {
 export type TableInfo = {
   name: string;
   type: 'table' | 'view';
-  rowCount: number | null;
-  sizeBytes: number | null;
 };
 
 /** Opaque handle to the wa-sqlite instance and the opened database. */
@@ -33,12 +31,6 @@ export type DbHandle = {
 
 /** Default cap on rows materialised per query to keep memory bounded. */
 export const DEFAULT_ROW_LIMIT = 5000;
-
-/**
- * Skip eager per-table COUNT(*) above this size: counting forces a full table
- * scan, which is expensive when each page is fetched lazily over the VFS.
- */
-const COUNT_SIZE_THRESHOLD = 200 * 1024 * 1024;
 
 let handlePromise: Promise<DbHandle> | null = null;
 
@@ -104,10 +96,7 @@ async function enableSchemaRecoveryMode(sqlite3: any, db: number): Promise<void>
   }
 }
 
-export async function listTables(
-  handle: DbHandle,
-  fileSize: number,
-): Promise<TableInfo[]> {
+export async function listTables(handle: DbHandle): Promise<TableInfo[]> {
   const meta = await query(
     handle,
     `SELECT name, type FROM sqlite_master
@@ -116,106 +105,13 @@ export async function listTables(
     null,
   );
 
-  const countRows = fileSize <= COUNT_SIZE_THRESHOLD;
   const tables: TableInfo[] = [];
   for (const row of meta.rows) {
     const name = String(row[0]);
     const type = row[1] === 'view' ? 'view' : 'table';
-    let rowCount: number | null = null;
-    if (type === 'table' && countRows) {
-      try {
-        const c = await query(
-          handle,
-          `SELECT COUNT(*) FROM "${name.replace(/"/g, '""')}"`,
-          null,
-        );
-        rowCount = Number(c.rows[0]?.[0] ?? 0);
-      } catch {
-        rowCount = null;
-      }
-    }
-    tables.push({
-      name,
-      type,
-      rowCount,
-      sizeBytes: null,
-    });
+    tables.push({ name, type });
   }
   return tables;
-}
-
-export async function loadTableSizes(
-  handle: DbHandle,
-  onProgress: (sizes: Map<string, number>, scannedPages: number) => void,
-): Promise<Map<string, number>> {
-  const objects = await query(
-    handle,
-    `SELECT name, tbl_name
-     FROM sqlite_master
-     WHERE type IN ('table','index')
-       AND tbl_name NOT LIKE 'sqlite_%'`,
-    null,
-  );
-
-  const tableByObject = new Map<string, string>();
-  for (const row of objects.rows) {
-    tableByObject.set(String(row[0]), String(row[1]));
-  }
-
-  const aggregateSizes = await loadAggregateTableSizes(handle, tableByObject);
-  if (aggregateSizes) {
-    onProgress(aggregateSizes, 0);
-    return aggregateSizes;
-  }
-
-  const { sqlite3, db } = handle;
-  const sizes = new Map<string, number>();
-  let scannedPages = 0;
-  let lastProgress = 0;
-
-  for await (const stmt of sqlite3.statements(
-    db,
-    `SELECT name, pgsize FROM dbstat WHERE name NOT LIKE 'sqlite_%'`,
-  )) {
-    while ((await sqlite3.step(stmt)) === SQLite.SQLITE_ROW) {
-      const [objectName, pgsize] = sqlite3.row(stmt);
-      const tableName = tableByObject.get(String(objectName));
-      if (!tableName) continue;
-
-      scannedPages++;
-      sizes.set(tableName, (sizes.get(tableName) ?? 0) + Number(pgsize ?? 0));
-      if (scannedPages - lastProgress >= 250) {
-        lastProgress = scannedPages;
-        onProgress(new Map(sizes), scannedPages);
-      }
-    }
-  }
-
-  onProgress(new Map(sizes), scannedPages);
-  return sizes;
-}
-
-async function loadAggregateTableSizes(
-  handle: DbHandle,
-  tableByObject: Map<string, string>,
-): Promise<Map<string, number> | null> {
-  try {
-    const result = await query(
-      handle,
-      `SELECT name, pgsize FROM dbstat('main', 1)
-       WHERE name NOT LIKE 'sqlite_%'`,
-      null,
-    );
-    const sizes = new Map<string, number>();
-    for (const row of result.rows) {
-      const tableName = tableByObject.get(String(row[0]));
-      if (!tableName) continue;
-      sizes.set(tableName, (sizes.get(tableName) ?? 0) + Number(row[1] ?? 0));
-    }
-    return sizes;
-  } catch {
-    return null;
-  }
 }
 
 export function runQuery(
