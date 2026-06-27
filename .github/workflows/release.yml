@@ -43,7 +43,9 @@ jobs:
             fi
 
             latest_version="${latest_tag#v}"
-            IFS=. read -r major minor patch <<< "${latest_version}"
+            current_version="$(node -p "require('./package.json').version")"
+            base_version="$(printf '%s\n%s\n' "${latest_version}" "${current_version}" | sort -V | tail -n 1)"
+            IFS=. read -r major minor patch <<< "${base_version}"
             next_version="${major}.${minor}.$((patch + 1))"
             release_tag="v${next_version}"
 
