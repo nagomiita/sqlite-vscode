@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { QueryResult, SqlValue } from '../db/sqlite';
+import { estimateTextWidth } from '../textMeasure';
 
 type SortState = { col: number; dir: 'asc' | 'desc' } | null;
 
@@ -52,7 +53,7 @@ const ROW_HEIGHT = 26;
 const IDX_WIDTH = 56;
 const CHAR_PX = 7.5;
 const MIN_COL = 80;
-const MAX_COL = 360;
+const MAX_COL = 900;
 
 export function Grid({ result, columnLabels, showLogical }: Props) {
   const { columns, rows } = result;
@@ -75,15 +76,17 @@ export function Grid({ result, columnLabels, showLogical }: Props) {
   const colWidths = useMemo(() => {
     const sample = rows.slice(0, 200);
     return columns.map((c, i) => {
-      let maxLen = headers[i].primary.length;
+      const header = headers[i];
+      const headerWidth =
+        estimateTextWidth(header.primary, 13, 600) +
+        (header.logical ? estimateTextWidth(c, 11, 400) + 6 : 0) +
+        36;
+      let maxWidth = headerWidth;
       for (const r of sample) {
-        const len = formatValue(r[i]).length;
-        if (len > maxLen) maxLen = len;
+        const width = Math.round(formatValue(r[i]).length * CHAR_PX) + 20;
+        if (width > maxWidth) maxWidth = width;
       }
-      return Math.min(
-        MAX_COL,
-        Math.max(MIN_COL, Math.round(maxLen * CHAR_PX) + 20),
-      );
+      return Math.min(MAX_COL, Math.max(MIN_COL, maxWidth));
     });
   }, [columns, rows, headers]);
 

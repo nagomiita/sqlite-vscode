@@ -146,6 +146,7 @@ body.resizing {
   white-space: nowrap;
 }
 .row-count {
+  flex: none;
   opacity: 0.55;
   font-size: 11px;
 }

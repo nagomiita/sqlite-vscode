@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type {
   HostToWebview,
@@ -19,6 +19,7 @@ import { guardReadOnlySql } from './db/guard';
 import { TableList } from './components/TableList';
 import { Grid } from './components/Grid';
 import { SqlRunner } from './components/SqlRunner';
+import { estimateTextWidth } from './textMeasure';
 
 type VsCodeApi = {
   postMessage: (msg: WebviewToHost) => void;
@@ -36,7 +37,7 @@ const persisted = (vscode.getState?.() ?? null) as {
 } | null;
 
 const MIN_SIDEBAR = 160;
-const MAX_SIDEBAR = 600;
+const MAX_SIDEBAR = 900;
 
 export function App() {
   const [db, setDb] = useState<DbHandle | null>(null);
@@ -55,7 +56,7 @@ export function App() {
     persisted?.sidebarWidth ?? 240,
   );
   const [sqlCollapsed, setSqlCollapsed] = useState<boolean>(
-    persisted?.sqlCollapsed ?? false,
+    persisted?.sqlCollapsed ?? true,
   );
   const [where, setWhere] = useState('');
 
@@ -72,11 +73,31 @@ export function App() {
     vscode.postMessage({ type: 'check-for-updates' });
   }, []);
 
+  const effectiveSidebarWidth = useMemo(() => {
+    if (!showLogical) return sidebarWidth;
+
+    const required = tables.reduce((max, table) => {
+      const logical = labels?.tables?.[table.name];
+      if (!logical) return max;
+
+      const primary = estimateTextWidth(logical, 13, 600);
+      const sub = estimateTextWidth(table.name, 11, 400) + 6;
+      const rowCount =
+        table.rowCount === null
+          ? 0
+          : estimateTextWidth(table.rowCount.toLocaleString(), 11, 400) + 12;
+      const chrome = 24 + 18 + 12 + rowCount + 18;
+      return Math.max(max, primary + sub + chrome);
+    }, MIN_SIDEBAR);
+
+    return Math.min(MAX_SIDEBAR, Math.max(sidebarWidth, required));
+  }, [labels, showLogical, sidebarWidth, tables]);
+
   const onResizeStart = useCallback(
     (e: ReactPointerEvent) => {
       e.preventDefault();
       const startX = e.clientX;
-      const startW = sidebarWidth;
+      const startW = effectiveSidebarWidth;
       const onMove = (ev: PointerEvent) => {
         const next = Math.min(
           MAX_SIDEBAR,
@@ -93,7 +114,7 @@ export function App() {
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
     },
-    [sidebarWidth],
+    [effectiveSidebarWidth],
   );
 
   const selectTable = useCallback(
@@ -205,7 +226,7 @@ export function App() {
         }}
         labels={labels}
         showLogical={showLogical}
-        width={sidebarWidth}
+        width={effectiveSidebarWidth}
       />
       <div
         className="resizer"
