@@ -73,10 +73,11 @@ npm run package    # produces a .vsix (requires @vscode/vsce)
 GitHub Actions runs type checking, build, and VSIX packaging on pull requests
 and pushes to `main`.
 
-To publish a GitHub Release with the VSIX attached, run the Release workflow
-manually. It bumps `package.json` to the next patch version, creates the matching
-`vX.Y.Z` tag, and publishes the VSIX. Pushing an existing `vX.Y.Z` tag still
-publishes that tag after validating it matches `package.json`.
+When CI succeeds for a push to `main`, the Release workflow bumps `package.json`
+to the next patch version, creates the matching `vX.Y.Z` GitHub Release tag, and
+publishes the VSIX. The Release workflow can also be run manually. Pushing an
+existing `vX.Y.Z` tag still publishes that tag after validating it matches
+`package.json`.
 
 ## Update
 
