@@ -57,7 +57,6 @@ const MAX_COL = 360;
 export function Grid({ result, columnLabels, showLogical }: Props) {
   const { columns, rows } = result;
   const [sort, setSort] = useState<SortState>(null);
-  const [filter, setFilter] = useState('');
   const [detail, setDetail] = useState<{
     column: string;
     value: SqlValue;
@@ -95,12 +94,6 @@ export function Grid({ result, columnLabels, showLogical }: Props) {
 
   const processed = useMemo(() => {
     let out = rows;
-    if (filter.trim()) {
-      const f = filter.toLowerCase();
-      out = out.filter((r) =>
-        r.some((c) => formatValue(c).toLowerCase().includes(f)),
-      );
-    }
     if (sort) {
       const { col, dir } = sort;
       out = [...out].sort((ra, rb) => {
@@ -109,7 +102,7 @@ export function Grid({ result, columnLabels, showLogical }: Props) {
       });
     }
     return out;
-  }, [rows, sort, filter]);
+  }, [rows, sort]);
 
   const rowVirtualizer = useVirtualizer({
     count: processed.length,
@@ -135,13 +128,6 @@ export function Grid({ result, columnLabels, showLogical }: Props) {
   return (
     <div className="grid-wrap">
       <div className="grid-toolbar">
-        <input
-          className="filter-input"
-          placeholder="Filter loaded rows (text match across all columns)…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          title="Filters only the rows already loaded into the grid. This is a plain text match across all columns — it is not a column-name search. Use the SQL box above for column conditions (e.g. WHERE name LIKE ...)."
-        />
         <span className="grid-count">
           {processed.length.toLocaleString()} rows
         </span>

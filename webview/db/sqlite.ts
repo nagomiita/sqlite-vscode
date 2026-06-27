@@ -132,7 +132,13 @@ export function runQuery(
   return query(handle, sql, limit);
 }
 
-export function selectFromTable(_handle: DbHandle, table: string): string {
+export function selectFromTable(
+  _handle: DbHandle,
+  table: string,
+  where?: string,
+): string {
   const safe = table.replace(/"/g, '""');
-  return `SELECT * FROM "${safe}"`;
+  const base = `SELECT * FROM "${safe}"`;
+  const clause = where?.trim();
+  return clause ? `${base} WHERE ${clause}` : base;
 }

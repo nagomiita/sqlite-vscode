@@ -33,6 +33,30 @@ body {
 .grid-empty {
   padding: 16px;
 }
+.loading {
+  text-align: center;
+}
+.grid-loading {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  text-align: center;
+}
+.grid-loading-img {
+  max-width: min(360px, 60%);
+  max-height: min(320px, 60%);
+  height: auto;
+  border-radius: 8px;
+}
+.grid-loading-text {
+  opacity: 0.8;
+  font-size: 13px;
+}
 .fatal {
   color: var(--vscode-errorForeground, #f14c4c);
 }
@@ -259,13 +283,55 @@ body.resizing {
   gap: 12px;
   padding: 6px 8px;
 }
-.filter-input {
-  flex: 0 0 240px;
+/* WHERE filter bar */
+.where-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--grid-border);
+}
+.where-label {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.where-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
   color: var(--vscode-input-foreground);
   background: var(--vscode-input-background);
   border: 1px solid var(--vscode-input-border, var(--grid-border));
   border-radius: 3px;
   padding: 3px 6px;
+}
+.where-run {
+  flex: none;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 3px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+.where-run:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+.where-clear {
+  flex: none;
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--vscode-input-border, var(--grid-border));
+  border-radius: 3px;
+  padding: 3px 10px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.where-clear:hover {
+  opacity: 1;
 }
 .grid-count {
   opacity: 0.6;

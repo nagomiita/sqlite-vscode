@@ -14,8 +14,11 @@
 - The sidebar is now resizable by dragging the divider; the width is remembered.
 - The SQL runner can be collapsed via the `SQL` section toggle; the state is
   remembered.
-- Clarified that the grid filter is a plain text match over already-loaded rows
-  (not a column-name search); use the SQL box for column conditions.
+- Replaced the client-side grid filter with a `WHERE` bar that appends your
+  condition to `SELECT * FROM <table>` and runs it in SQLite, so indexes are
+  used and the whole table is searched (not just the loaded rows). Switching
+  tables clears the condition; the read-only SQL guard still applies.
+- A loading illustration is shown in the grid area while a query is running.
 
 ## 0.0.1
 
