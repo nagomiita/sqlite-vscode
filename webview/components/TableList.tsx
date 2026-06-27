@@ -3,6 +3,7 @@ import type { TableInfo } from '../db/sqlite';
 import { formatBytes } from '../format';
 
 type TableMetricMode = 'rows' | 'size' | 'both';
+type SizeLoadState = 'idle' | 'loading' | 'done' | 'unavailable';
 
 type Props = {
   tables: TableInfo[];
@@ -13,6 +14,7 @@ type Props = {
   width: number;
   metricMode: TableMetricMode;
   onMetricModeChange: (mode: TableMetricMode) => void;
+  sizeLoadState: SizeLoadState;
 };
 
 export function TableList({
@@ -24,6 +26,7 @@ export function TableList({
   width,
   metricMode,
   onMetricModeChange,
+  sizeLoadState,
 }: Props) {
   const maxRows = Math.max(0, ...tables.map((t) => t.rowCount ?? 0));
   const maxSize = Math.max(0, ...tables.map((t) => t.sizeBytes ?? 0));
@@ -60,6 +63,11 @@ export function TableList({
             t.rowCount === null ? null : `${t.rowCount.toLocaleString()} rows`;
           const sizeText =
             t.sizeBytes === null ? null : formatBytes(t.sizeBytes);
+          const isSizePending =
+            showSize &&
+            t.type === 'table' &&
+            t.sizeBytes === null &&
+            sizeLoadState === 'loading';
           const titleParts = [
             logical ? `${logical} (${t.name})` : t.name,
             rowText,
@@ -86,23 +94,40 @@ export function TableList({
                 </span>
                 <span className="table-metrics">
                   {showRows && rowText && (
-                    <span className="metric-row">
+                    <span className="metric-line">
                       <span className="metric-value">
                         {t.rowCount?.toLocaleString()}
                       </span>
-                      <span className="metric-bar" aria-hidden="true">
+                      <span className="metric-bar rows" aria-hidden="true">
                         <span style={{ width: `${rowPct * 100}%` }} />
                       </span>
                     </span>
                   )}
                   {showSize && sizeText && (
-                    <span className="metric-row">
+                    <span className="metric-line">
                       <span className="metric-value">{sizeText}</span>
                       <span className="metric-bar size" aria-hidden="true">
                         <span style={{ width: `${sizePct * 100}%` }} />
                       </span>
                     </span>
                   )}
+                  {isSizePending && (
+                    <span className="metric-line loading">
+                      <span className="metric-value">loading</span>
+                      <span className="metric-bar pending" aria-hidden="true">
+                        <span />
+                      </span>
+                    </span>
+                  )}
+                  {showSize &&
+                    t.type === 'table' &&
+                    sizeLoadState === 'unavailable' &&
+                    t.sizeBytes === null && (
+                      <span className="metric-line unavailable">
+                        <span className="metric-value">unavailable</span>
+                        <span className="metric-bar unavailable" />
+                      </span>
+                    )}
                 </span>
               </button>
             </li>

@@ -6,6 +6,7 @@ import type {
   WebviewToHost,
 } from '../shared/protocol';
 import {
+  getTableSizeBytes,
   listTables,
   openDatabase,
   runQuery,
@@ -23,6 +24,7 @@ import { estimateTextWidth } from './textMeasure';
 import { formatBytes } from './format';
 
 type TableMetricMode = 'rows' | 'size' | 'both';
+type SizeLoadState = 'idle' | 'loading' | 'done' | 'unavailable';
 
 type VsCodeApi = {
   postMessage: (msg: WebviewToHost) => void;
@@ -65,6 +67,7 @@ export function App() {
   const [tableMetricMode, setTableMetricMode] = useState<TableMetricMode>(
     persisted?.tableMetricMode ?? 'both',
   );
+  const [sizeLoadState, setSizeLoadState] = useState<SizeLoadState>('idle');
   const [where, setWhere] = useState('');
 
   // Persist all UI preferences together so no key clobbers another.
@@ -102,7 +105,7 @@ export function App() {
         tableMetricMode === 'rows' || table.sizeBytes === null
           ? 0
           : estimateTextWidth(formatBytes(table.sizeBytes), 11, 600) + 12;
-      const chrome = 24 + 18 + 12 + rowCount + size + 42;
+      const chrome = 24 + 18 + 12 + rowCount + size + 72;
       return Math.max(max, primary + sub + chrome);
     }, MIN_SIDEBAR);
 
@@ -167,6 +170,54 @@ export function App() {
   }, [db, active, selectTable]);
 
   useEffect(() => {
+    if (!db) return;
+    if (tableMetricMode === 'rows') return;
+    if (sizeLoadState !== 'idle') return;
+
+    const sizeTargets = tables.filter(
+      (table) => table.type === 'table' && table.sizeBytes === null,
+    );
+    if (sizeTargets.length === 0) {
+      setSizeLoadState('done');
+      return;
+    }
+
+    let cancelled = false;
+    setSizeLoadState('loading');
+    void (async () => {
+      for (const table of sizeTargets) {
+        try {
+          const sizeBytes = await getTableSizeBytes(db, table.name);
+          if (cancelled) return;
+          setTables((prev) =>
+            prev.map((item) =>
+              item.name === table.name && item.type === table.type
+                ? { ...item, sizeBytes }
+                : item,
+            ),
+          );
+        } catch {
+          if (!cancelled) {
+            setSizeLoadState('unavailable');
+            vscode.postMessage({
+              type: 'notify',
+              level: 'warn',
+              message:
+                'Table size display is unavailable because SQLite dbstat is not enabled.',
+            });
+          }
+          return;
+        }
+      }
+      if (!cancelled) setSizeLoadState('done');
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [db, sizeLoadState, tableMetricMode, tables]);
+
+  useEffect(() => {
     const handler = async (e: MessageEvent<HostToWebview>) => {
       const msg = e.data;
       if (msg.type === 'error') {
@@ -183,16 +234,9 @@ export function App() {
           const handle = await openDatabase(source);
           setDb(handle);
           setFileName(msg.fileName);
-          const { tables: t, dbstatError } = await listTables(handle, msg.size);
+          const t = await listTables(handle, msg.size);
           setTables(t);
-          if (dbstatError) {
-            vscode.postMessage({
-              type: 'notify',
-              level: 'warn',
-              message:
-                'Table size display is unavailable because SQLite dbstat is not enabled.',
-            });
-          }
+          setSizeLoadState('idle');
           if (t.length > 0) {
             await selectTable(handle, t[0].name);
           }
@@ -253,6 +297,7 @@ export function App() {
         width={effectiveSidebarWidth}
         metricMode={tableMetricMode}
         onMetricModeChange={setTableMetricMode}
+        sizeLoadState={sizeLoadState}
       />
       <div
         className="resizer"

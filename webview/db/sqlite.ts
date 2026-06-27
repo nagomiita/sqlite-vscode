@@ -25,11 +25,6 @@ export type TableInfo = {
   sizeBytes: number | null;
 };
 
-export type TableListResult = {
-  tables: TableInfo[];
-  dbstatError: string | null;
-};
-
 /** Opaque handle to the wa-sqlite instance and the opened database. */
 export type DbHandle = {
   sqlite3: any;
@@ -98,7 +93,7 @@ async function query(
 export async function listTables(
   handle: DbHandle,
   fileSize: number,
-): Promise<TableListResult> {
+): Promise<TableInfo[]> {
   const meta = await query(
     handle,
     `SELECT name, type FROM sqlite_master
@@ -106,29 +101,6 @@ export async function listTables(
      ORDER BY type, name`,
     null,
   );
-
-  let dbstatError: string | null = null;
-  const sizes = new Map<string, number>();
-  try {
-    const stat = await query(
-      handle,
-      `SELECT m.tbl_name, SUM(s.pgsize)
-       FROM dbstat AS s
-       JOIN sqlite_master AS m ON m.name = s.name
-       WHERE m.type IN ('table','index')
-         AND m.tbl_name NOT LIKE 'sqlite_%'
-       GROUP BY m.tbl_name`,
-      null,
-    );
-    for (const row of stat.rows) {
-      sizes.set(String(row[0]), Number(row[1] ?? 0));
-    }
-  } catch (err) {
-    dbstatError =
-      err instanceof Error
-        ? err.message
-        : 'SQLite dbstat virtual table is unavailable.';
-  }
 
   const countRows = fileSize <= COUNT_SIZE_THRESHOLD;
   const tables: TableInfo[] = [];
@@ -152,10 +124,27 @@ export async function listTables(
       name,
       type,
       rowCount,
-      sizeBytes: type === 'table' ? sizes.get(name) ?? null : null,
+      sizeBytes: null,
     });
   }
-  return { tables, dbstatError };
+  return tables;
+}
+
+export async function getTableSizeBytes(
+  handle: DbHandle,
+  table: string,
+): Promise<number> {
+  const safe = table.replace(/'/g, "''");
+  const result = await query(
+    handle,
+    `SELECT COALESCE(SUM(s.pgsize), 0)
+     FROM dbstat AS s
+     JOIN sqlite_master AS m ON m.name = s.name
+     WHERE m.type IN ('table','index')
+       AND m.tbl_name = '${safe}'`,
+    null,
+  );
+  return Number(result.rows[0]?.[0] ?? 0);
 }
 
 export function runQuery(
