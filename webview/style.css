@@ -184,41 +184,50 @@ body {
   flex: 1;
   overflow: auto;
 }
-.grid-table {
-  border-collapse: collapse;
-  width: max-content;
+.grid-inner {
+  position: relative;
   min-width: 100%;
 }
-.grid-table thead th {
+.grid-head {
   position: sticky;
   top: 0;
   z-index: 1;
+  display: grid;
   background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background));
   border-bottom: 1px solid var(--grid-border);
-  border-right: 1px solid var(--grid-border);
+}
+.hcell {
   padding: 4px 8px;
+  border-right: 1px solid var(--grid-border);
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   user-select: none;
-  min-width: 80px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.hcell-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .idx-col {
-  min-width: 44px;
-  width: 44px;
   opacity: 0.5;
   text-align: right;
+  justify-content: flex-end;
 }
 .grid-body {
   position: relative;
-  width: max-content;
   min-width: 100%;
 }
 .grid-row {
   position: absolute;
   top: 0;
   left: 0;
-  display: flex;
+  display: grid;
   width: 100%;
 }
 .grid-row:hover .cell {
@@ -231,8 +240,15 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 80px;
-  max-width: 360px;
+  cursor: default;
+}
+.cell:hover {
+  outline: 1px solid var(--vscode-focusBorder, transparent);
+  outline-offset: -1px;
+}
+.blob-cell {
+  font-family: var(--vscode-editor-font-family, monospace);
+  opacity: 0.8;
 }
 .null-cell {
   opacity: 0.4;
@@ -240,4 +256,45 @@ body {
 }
 .sort-ind {
   opacity: 0.8;
+  margin-left: auto;
+}
+
+/* Cell detail panel */
+.detail-panel {
+  border-top: 1px solid var(--grid-border);
+  max-height: 35%;
+  display: flex;
+  flex-direction: column;
+  background: var(--vscode-editor-background);
+}
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--grid-border);
+}
+.detail-col {
+  font-weight: 600;
+}
+.detail-kind {
+  opacity: 0.6;
+  font-size: 12px;
+}
+.detail-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+.detail-body {
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
 }
