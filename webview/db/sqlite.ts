@@ -162,6 +162,12 @@ export async function loadTableSizes(
     tableByObject.set(String(row[0]), String(row[1]));
   }
 
+  const aggregateSizes = await loadAggregateTableSizes(handle, tableByObject);
+  if (aggregateSizes) {
+    onProgress(aggregateSizes, 0);
+    return aggregateSizes;
+  }
+
   const { sqlite3, db } = handle;
   const sizes = new Map<string, number>();
   let scannedPages = 0;
@@ -187,6 +193,29 @@ export async function loadTableSizes(
 
   onProgress(new Map(sizes), scannedPages);
   return sizes;
+}
+
+async function loadAggregateTableSizes(
+  handle: DbHandle,
+  tableByObject: Map<string, string>,
+): Promise<Map<string, number> | null> {
+  try {
+    const result = await query(
+      handle,
+      `SELECT name, pgsize FROM dbstat('main', 1)
+       WHERE name NOT LIKE 'sqlite_%'`,
+      null,
+    );
+    const sizes = new Map<string, number>();
+    for (const row of result.rows) {
+      const tableName = tableByObject.get(String(row[0]));
+      if (!tableName) continue;
+      sizes.set(tableName, (sizes.get(tableName) ?? 0) + Number(row[1] ?? 0));
+    }
+    return sizes;
+  } catch {
+    return null;
+  }
 }
 
 export function runQuery(

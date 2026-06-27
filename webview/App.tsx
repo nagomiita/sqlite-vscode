@@ -44,6 +44,7 @@ const persisted = (vscode.getState?.() ?? null) as {
 
 const MIN_SIDEBAR = 160;
 const MAX_SIDEBAR = 900;
+const TABLE_SIZE_SCAN_TIMEOUT_MS = 15_000;
 
 function log(level: 'info' | 'warn' | 'error', message: string): void {
   vscode.postMessage({ type: 'log', level, message });
@@ -187,19 +188,43 @@ export function App() {
     }
 
     let cancelled = false;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return;
+      timedOut = true;
+      setSizeLoadState('unavailable');
+      log(
+        'warn',
+        `dbstat table size scan timed out after ${TABLE_SIZE_SCAN_TIMEOUT_MS / 1000}s.`,
+      );
+      vscode.postMessage({
+        type: 'notify',
+        level: 'warn',
+        message:
+          'Table size calculation timed out. This database is too large or slow for dbstat size scanning.',
+      });
+    }, TABLE_SIZE_SCAN_TIMEOUT_MS);
+
     setSizeLoadState('loading');
     void (async () => {
       log('info', `Starting dbstat table size scan (${sizeTargets.length} tables).`);
       try {
         let lastLoggedPages = 0;
         await loadTableSizes(db, (sizes, scannedPages) => {
-          if (cancelled) return;
+          if (cancelled || timedOut) return;
           setTables((prev) =>
             prev.map((item) => {
               const sizeBytes = sizes.get(item.name);
               return sizeBytes === undefined ? item : { ...item, sizeBytes };
             }),
           );
+          if (scannedPages === 0) {
+            log(
+              'info',
+              `dbstat aggregate size scan returned ${sizes.size.toLocaleString()} tables.`,
+            );
+            return;
+          }
           if (scannedPages - lastLoggedPages >= 1000) {
             lastLoggedPages = scannedPages;
             log(
@@ -209,7 +234,8 @@ export function App() {
           }
         });
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && !timedOut) {
+          window.clearTimeout(timeout);
           const message = err instanceof Error ? err.message : String(err);
           setSizeLoadState('unavailable');
           log('warn', `dbstat table size scan failed: ${message}`);
@@ -222,7 +248,8 @@ export function App() {
         }
         return;
       }
-      if (!cancelled) {
+      if (!cancelled && !timedOut) {
+        window.clearTimeout(timeout);
         log('info', 'Finished dbstat table size scan.');
         setSizeLoadState('done');
       }
@@ -230,6 +257,7 @@ export function App() {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, [db, sizeLoadState, tableMetricMode, tables]);
 
