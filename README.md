@@ -68,6 +68,21 @@ Then press `F5` ("Run Extension") and open a `.db` file in the new window.
 npm run package    # produces a .vsix (requires @vscode/vsce)
 ```
 
+## CI and Release
+
+GitHub Actions runs type checking, build, and VSIX packaging on pull requests
+and pushes to `main`.
+
+To publish a GitHub Release with the VSIX attached, create and push a tag that
+matches `package.json`:
+
+```bash
+git tag v0.0.1
+git push origin v0.0.1
+```
+
+The release workflow can also be run manually with the same `vX.Y.Z` tag.
+
 ## License
 
 MIT
