@@ -3,9 +3,17 @@
   "displayName": "SQLite Vscode",
   "description": "Quick read-only SQLite viewer for VS Code with a virtualized table UI and a read-only SQL runner.",
   "version": "0.0.1",
-  "publisher": "local",
+  "publisher": "nagomiita",
   "private": true,
   "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nagomiita/sqlite-vscode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nagomiita/sqlite-vscode/issues"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -49,6 +57,7 @@
     "watch": "node esbuild.js --watch",
     "vscode:prepublish": "node esbuild.js --production",
     "typecheck": "tsc --noEmit",
+    "icon": "node scripts/make-icon.mjs",
     "package": "vsce package --no-dependencies"
   },
   "dependencies": {
@@ -63,7 +72,9 @@
     "@types/react-dom": "^18.3.1",
     "@types/sql.js": "^1.4.9",
     "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.24.0",
+    "pngjs": "^7.0.0",
     "typescript": "^5.6.3"
   }
 }

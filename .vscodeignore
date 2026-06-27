@@ -3,7 +3,11 @@ node_modules/**
 webview/**
 src/**
 shared/**
+scripts/**
 esbuild.js
 tsconfig.json
 **/*.map
 .gitignore
+.nvmrc
+**/*.ts
+**/*.tsx
