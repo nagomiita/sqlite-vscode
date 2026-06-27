@@ -15,6 +15,7 @@ import {
   type TableInfo,
 } from './db/sqlite';
 import { HostRangeSource } from './db/rangeSource';
+import { guardReadOnlySql } from './db/guard';
 import { TableList } from './components/TableList';
 import { Grid } from './components/Grid';
 import { SqlRunner } from './components/SqlRunner';
@@ -56,6 +57,7 @@ export function App() {
   const [sqlCollapsed, setSqlCollapsed] = useState<boolean>(
     persisted?.sqlCollapsed ?? false,
   );
+  const [where, setWhere] = useState('');
 
   // Persist all UI preferences together so no key clobbers another.
   useEffect(() => {
@@ -91,12 +93,20 @@ export function App() {
   );
 
   const selectTable = useCallback(
-    async (handle: DbHandle, name: string) => {
+    async (handle: DbHandle, name: string, whereClause = '') => {
       setActive(name);
+      const sql = selectFromTable(handle, name, whereClause);
+      if (whereClause.trim()) {
+        const guard = guardReadOnlySql(sql);
+        if (!guard.ok) {
+          setQueryError(guard.reason);
+          return;
+        }
+      }
       setQueryError(null);
       setBusy(true);
       try {
-        setResult(await runQuery(handle, selectFromTable(handle, name)));
+        setResult(await runQuery(handle, sql));
       } catch (err) {
         setQueryError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -105,6 +115,15 @@ export function App() {
     },
     [],
   );
+
+  const applyWhere = useCallback(() => {
+    if (db && active) selectTable(db, active, where);
+  }, [db, active, where, selectTable]);
+
+  const clearWhere = useCallback(() => {
+    setWhere('');
+    if (db && active) selectTable(db, active, '');
+  }, [db, active, selectTable]);
 
   useEffect(() => {
     const handler = async (e: MessageEvent<HostToWebview>) => {
@@ -163,6 +182,8 @@ export function App() {
     return <div className="loading">Loading database…</div>;
   }
 
+  const loadingSrc = (window as unknown as { LOADING_IMAGE_URI?: string })
+    .LOADING_IMAGE_URI;
   const hasLabels = Boolean(
     labels && (labels.tables || labels.columns),
   );
@@ -174,7 +195,10 @@ export function App() {
       <TableList
         tables={tables}
         active={active}
-        onSelect={(name) => selectTable(db, name)}
+        onSelect={(name) => {
+          setWhere('');
+          selectTable(db, name);
+        }}
         labels={labels}
         showLogical={showLogical}
         width={sidebarWidth}
@@ -212,13 +236,48 @@ export function App() {
           </button>
         </div>
         {!sqlCollapsed && <SqlRunner onRun={onRunSql} error={queryError} />}
+        {active && (
+          <div className="where-bar">
+            <span className="where-label">WHERE</span>
+            <input
+              className="where-input"
+              placeholder="age > 30 AND name LIKE 'A%'  — runs as SQL, uses indexes"
+              value={where}
+              spellCheck={false}
+              onChange={(e) => setWhere(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applyWhere();
+              }}
+              title="Type the condition after WHERE. It is appended to SELECT * FROM the active table and executed in SQLite, so indexes are used and the whole table is searched (not just loaded rows)."
+            />
+            <button type="button" className="where-run" onClick={applyWhere}>
+              Apply
+            </button>
+            {where && (
+              <button
+                type="button"
+                className="where-clear"
+                onClick={clearWhere}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
         {result?.truncated ? (
           <div className="truncated-banner">
             Showing the first {result.rows.length.toLocaleString()} rows. Add a
             narrower query to see more.
           </div>
         ) : null}
-        {busy ? <div className="grid-empty">Running…</div> : null}
+        {busy ? (
+          <div className="grid-loading">
+            {loadingSrc && (
+              <img className="grid-loading-img" src={loadingSrc} alt="" />
+            )}
+            <div className="grid-loading-text">Running…</div>
+          </div>
+        ) : null}
         {!busy && result ? (
           <Grid
             result={result}

@@ -24,6 +24,9 @@ export function getWebviewHtml(
   const wasmUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'media', 'wa-sqlite-async.wasm'),
   );
+  const loadingUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'media', 'loading.png'),
+  );
 
   const csp = [
     `default-src 'none'`,
@@ -47,6 +50,7 @@ export function getWebviewHtml(
   <div id="root"></div>
   <script nonce="${nonce}">
     window.WASQLITE_WASM_URI = ${JSON.stringify(wasmUri.toString())};
+    window.LOADING_IMAGE_URI = ${JSON.stringify(loadingUri.toString())};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
